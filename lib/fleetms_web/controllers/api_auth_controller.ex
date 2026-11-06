@@ -1,7 +1,18 @@
 defmodule FleetmsWeb.ApiAuthController do
   use FleetmsWeb, :controller
 
+  # Honors the `user_registration` feature flag like the browser sign-up
+  # (`FleetmsWeb.Plugs.PublicRegistration`), so an invite-only install can't be
+  # joined through the API either.
   def register(conn, params) do
+    if Fleetms.FeatureFlags.user_registration?() do
+      do_register(conn, params)
+    else
+      error(conn, 403, "Sign-up is currently disabled.")
+    end
+  end
+
+  defp do_register(conn, params) do
     strategy = AshAuthentication.Info.strategy!(Fleetms.Accounts.User, :password)
 
     case AshAuthentication.Strategy.action(strategy, :register, params) do
