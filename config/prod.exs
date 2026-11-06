@@ -33,8 +33,8 @@ config :swoosh, local: false
 # actually deliver mail.
 config :fleetms, Fleetms.Mailer, adapter: Swoosh.Adapters.Logger
 
-# User uploads (vehicle photos, inspection images, documents) persist on a Fly
-# volume mounted at /data (see fly.toml [[mounts]]), so they survive redeploys.
+# User uploads (vehicle photos, inspection images, documents) persist on a
+# volume mounted at /data (Railway volume / Fly mount), so they survive redeploys.
 # Both the local-storage writer and the /uploads static route point at it. (When
 # S3_BUCKET is set in runtime.exs the S3 adapter takes over and these are unused.)
 config :fleetms, :uploads_dir, "/data/uploads"

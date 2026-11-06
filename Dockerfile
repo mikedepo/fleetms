@@ -100,7 +100,7 @@ ENV MIX_ENV="prod"
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/fleetms ./
 
 # NOTE: we intentionally run as root (not `nobody`) so the app can write to the
-# Fly volume mounted at /data (see fly.toml), whose mount point is root-owned.
+# volume mounted at /data (a Railway/Fly volume), whose mount point is root-owned.
 # Acceptable for this demo; for production, chown the volume and drop to `nobody`.
 # USER nobody
 

@@ -42,8 +42,23 @@ defmodule Fleetms.Application do
     Fleetms.Individuals.configure_from_db()
     # Seed default feature-flag values (only for flags not yet set).
     Fleetms.FeatureFlags.ensure_defaults!()
+    maybe_bootstrap_admin()
 
     result
+  end
+
+  # Create the first platform admin from ADMIN_EMAIL / ADMIN_PASSWORD, if set and
+  # not already present. See `Fleetms.AdminBootstrap`.
+  defp maybe_bootstrap_admin do
+    Task.Supervisor.start_child(Fleetms.TaskSupervisor, fn ->
+      try do
+        Fleetms.AdminBootstrap.run()
+      rescue
+        error ->
+          require Logger
+          Logger.warning("[AdminBootstrap] Skipped on boot: #{Exception.message(error)}")
+      end
+    end)
   end
 
   # Apply per-tenant schema migrations off the deploy critical path: enqueue one

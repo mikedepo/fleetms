@@ -1,10 +1,10 @@
 defmodule Fleetms.Release do
   @moduledoc """
-  DB release tasks, run in production where Mix isn't available (e.g. Fly's
-  `release_command`, or `bin/fleetms eval`).
+  DB release tasks, run in production where Mix isn't available (e.g. Railway's
+  `preDeployCommand` in railway.json, Fly's `release_command`, or `bin/fleetms eval`).
 
   `migrate/0` brings the **public** schema up to date. It is what the deploy's
-  `release_command` runs, and it is a hard prerequisite for the new code. The
+  pre-deploy step runs, and it is a hard prerequisite for the new code. The
   per-tenant (schema-per-org) migrations no longer run here — they are applied
   off the deploy critical path as background jobs on boot (see
   `Fleetms.TenantMigrations`). `migrate_tenants/0` runs them all synchronously
