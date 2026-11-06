@@ -161,7 +161,18 @@ end
 #   MAILER_ADAPTER=postmark  POSTMARK_API_KEY
 #
 # Also set EMAIL_FROM (the address mail is sent from, e.g. no-reply@yourco.com).
-mailer_adapter = System.get_env("MAILER_ADAPTER")
+#
+# Blank values count as unset (hosting platforms such as Railway pass optional
+# fields left empty as ""), and setting SMTP_RELAY alone selects SMTP, so a
+# deploy form with optional email fields works whether or not they're filled.
+env_present = fn name ->
+  case System.get_env(name) do
+    nil -> nil
+    value -> if String.trim(value) == "", do: nil, else: value
+  end
+end
+
+mailer_adapter = env_present.("MAILER_ADAPTER") || (env_present.("SMTP_RELAY") && "smtp")
 
 if config_env() != :test && mailer_adapter do
   # The API adapters below post over HTTP; Swoosh needs an API client for them.
@@ -169,15 +180,18 @@ if config_env() != :test && mailer_adapter do
 
   case String.downcase(mailer_adapter) do
     "smtp" ->
+      smtp_username = env_present.("SMTP_USERNAME")
+
       config :fleetms, Fleetms.Mailer,
         adapter: Swoosh.Adapters.SMTP,
         relay: System.fetch_env!("SMTP_RELAY"),
-        username: System.fetch_env!("SMTP_USERNAME"),
-        password: System.fetch_env!("SMTP_PASSWORD"),
-        port: String.to_integer(System.get_env("SMTP_PORT", "587")),
-        ssl: System.get_env("SMTP_SSL", "false") == "true",
-        tls: String.to_atom(System.get_env("SMTP_TLS", "if_available")),
-        auth: :always,
+        username: smtp_username,
+        password: env_present.("SMTP_PASSWORD"),
+        port: String.to_integer(env_present.("SMTP_PORT") || "587"),
+        ssl: env_present.("SMTP_SSL") == "true",
+        tls: String.to_atom(env_present.("SMTP_TLS") || "if_available"),
+        # Relays that accept unauthenticated mail (e.g. an internal one) need no login.
+        auth: if(smtp_username, do: :always, else: :never),
         retries: 2
 
     "mailgun" ->
@@ -202,8 +216,15 @@ if config_env() != :test && mailer_adapter do
 end
 
 # The address transactional email is sent from. Falls back to the built-in default.
-if from = System.get_env("EMAIL_FROM") do
-  config :fleetms, :email_from, {System.get_env("EMAIL_FROM_NAME", "FleetMS"), from}
+if from = env_present.("EMAIL_FROM") do
+  config :fleetms, :email_from, {env_present.("EMAIL_FROM_NAME") || "FleetMS", from}
+end
+
+# Whether public self-service sign-up starts on for a new install. Only the
+# first boot uses it: afterwards the flag lives in the database and staff toggle
+# it under Admin, Feature flags. See `Fleetms.FeatureFlags`.
+if user_registration = env_present.("USER_REGISTRATION") do
+  config :fleetms, :user_registration_default, user_registration in ~w(true 1)
 end
 
 # Object storage (optional). When `S3_BUCKET` is set, uploads are stored in

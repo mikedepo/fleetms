@@ -41,23 +41,37 @@ defmodule Fleetms.AdminBootstrap do
 
   # Mirrors the platform-admin setup in priv/repo/seeds.exs: `is_super_admin` and
   # `confirmed_at` aren't writable through actions, so they're set with Ash.Seed.
+  #
+  # Invalid input (a password under 8 characters, a malformed email) must not
+  # take the deploy down: the app keeps running and the log says how to fix it.
   defp create_admin(email, password) do
-    user =
-      Accounts.User
-      |> Ash.Changeset.for_create(:register_with_password, %{
-        email: email,
-        password: password,
-        password_confirmation: password
-      })
-      |> Ash.create!(authorize?: false)
-      |> Ash.Seed.update!(%{confirmed_at: DateTime.utc_now(), is_super_admin: true})
+    Accounts.User
+    |> Ash.Changeset.for_create(:register_with_password, %{
+      email: email,
+      password: password,
+      password_confirmation: password
+    })
+    |> Ash.create(authorize?: false)
+    |> case do
+      {:ok, user} ->
+        user = Ash.Seed.update!(user, %{confirmed_at: DateTime.utc_now(), is_super_admin: true})
 
-    Accounts.create_user_profile!(
-      %{user_id: user.id, first_name: "Platform", last_name: "Admin"},
-      authorize?: false
-    )
+        Accounts.create_user_profile!(
+          %{user_id: user.id, first_name: "Platform", last_name: "Admin"},
+          authorize?: false
+        )
 
-    Logger.info("[AdminBootstrap] Created platform admin #{email}")
-    :created
+        Logger.info("[AdminBootstrap] Created platform admin #{email}")
+        :created
+
+      {:error, error} ->
+        Logger.warning(
+          "[AdminBootstrap] Could not create the platform admin #{email}: " <>
+            Exception.message(error) <>
+            " Fix ADMIN_EMAIL or ADMIN_PASSWORD (at least 8 characters) and redeploy."
+        )
+
+        {:error, error}
+    end
   end
 end

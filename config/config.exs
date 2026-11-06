@@ -222,6 +222,10 @@ config :ex_aws,
   http_client: Fleetms.Storage.S3.ReqClient,
   json_codec: Jason
 
+# Exchange rates aren't used, so don't start ex_money's retriever (its automatic
+# start is deprecated and logs a warning on every boot).
+config :ex_money, auto_start_exchange_rate_service: false
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

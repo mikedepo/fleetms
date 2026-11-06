@@ -28,6 +28,21 @@ defmodule Fleetms.AdminBootstrapTest do
     assert after_run.hashed_password == before.hashed_password
   end
 
+  test "a password that breaks the rules logs how to fix it instead of crashing" do
+    email = unique_email()
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:error, _} = AdminBootstrap.run(email, "short")
+      end)
+
+    assert log =~ "Could not create the platform admin"
+    assert log =~ "ADMIN_PASSWORD (at least 8 characters)"
+
+    assert {:ok, nil} =
+             Accounts.get_user_by_email(email, authorize?: false, not_found_error?: false)
+  end
+
   test "skips when either variable is missing or blank" do
     assert AdminBootstrap.run(nil, "a-long-secret-pw") == :skipped
     assert AdminBootstrap.run(unique_email(), nil) == :skipped

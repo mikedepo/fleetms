@@ -16,7 +16,9 @@ defmodule Fleetms.FeatureFlags do
     * `:individual_registration` (default on) — the pool-based individual-client
       workflow. Off ⇒ individuals are provisioned into their own org/schema and
       the pool UI is hidden.
-    * `:user_registration` (default on) — public self-service sign-up.
+    * `:user_registration` (default on) — public self-service sign-up. A new
+      install can start with it off by setting `USER_REGISTRATION=false`
+      (`:user_registration_default`); only the first boot reads it.
     * `:maintenance_mode` (default off) — serve the 503 maintenance page to
       non-staff; staff pass through.
     * `:public_api` (default on) — the public JSON:API under `/api/v1`. Off ⇒ data
@@ -51,6 +53,21 @@ defmodule Fleetms.FeatureFlags do
   @spec names() :: [atom()]
   def names, do: Keyword.keys(@flags)
 
+  @doc """
+  Each flag's default, applying deployment overrides from config (currently
+  `:user_registration_default`, set from `USER_REGISTRATION` in runtime.exs).
+  """
+  @spec defaults() :: keyword(boolean())
+  def defaults do
+    case Application.fetch_env(:fleetms, :user_registration_default) do
+      {:ok, enabled?} when is_boolean(enabled?) ->
+        Keyword.put(@flags, :user_registration, enabled?)
+
+      _ ->
+        @flags
+    end
+  end
+
   @doc "Whether `flag` is enabled globally."
   @spec enabled?(atom()) :: boolean()
   def enabled?(flag) when is_atom(flag), do: FunWithFlags.enabled?(flag)
@@ -84,7 +101,7 @@ defmodule Fleetms.FeatureFlags do
         _ -> []
       end
 
-    for {flag, default} <- @flags, flag not in existing do
+    for {flag, default} <- defaults(), flag not in existing do
       if default, do: enable(flag), else: disable(flag)
     end
 
