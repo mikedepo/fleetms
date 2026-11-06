@@ -162,9 +162,9 @@ end
 #
 # Also set EMAIL_FROM (the address mail is sent from, e.g. no-reply@yourco.com).
 #
-# Blank values count as unset (hosting platforms such as Railway pass optional
-# fields left empty as ""), and setting SMTP_RELAY alone selects SMTP, so a
-# deploy form with optional email fields works whether or not they're filled.
+# Blank values count as unset (some hosting platforms pass optional settings
+# left empty as ""), and setting SMTP_RELAY alone selects SMTP, so optional
+# email settings work whether or not they're filled in.
 env_present = fn name ->
   case System.get_env(name) do
     nil -> nil
@@ -180,19 +180,40 @@ if config_env() != :test && mailer_adapter do
 
   case String.downcase(mailer_adapter) do
     "smtp" ->
+      smtp_relay = System.fetch_env!("SMTP_RELAY")
       smtp_username = env_present.("SMTP_USERNAME")
+      smtp_ssl? = env_present.("SMTP_SSL") == "true"
 
-      config :fleetms, Fleetms.Mailer,
-        adapter: Swoosh.Adapters.SMTP,
-        relay: System.fetch_env!("SMTP_RELAY"),
-        username: smtp_username,
-        password: env_present.("SMTP_PASSWORD"),
-        port: String.to_integer(env_present.("SMTP_PORT") || "587"),
-        ssl: env_present.("SMTP_SSL") == "true",
-        tls: String.to_atom(env_present.("SMTP_TLS") || "if_available"),
-        # Relays that accept unauthenticated mail (e.g. an internal one) need no login.
-        auth: if(smtp_username, do: :always, else: :never),
-        retries: 2
+      # Since OTP 26, TLS verifies the server certificate by default, and gen_smtp
+      # doesn't supply the CA store or hostname check itself: without these
+      # options every STARTTLS (587) or SSL (465) connection fails, so no mail is
+      # ever sent. They go in tls_options for STARTTLS, and in sockopts only for
+      # SSL-from-the-start (on a plain TCP connect they would be rejected).
+      smtp_tls = [
+        verify: :verify_peer,
+        cacerts: :public_key.cacerts_get(),
+        server_name_indication: String.to_charlist(smtp_relay),
+        depth: 99,
+        customize_hostname_check: [
+          match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+        ]
+      ]
+
+      config :fleetms,
+             Fleetms.Mailer,
+             [
+               adapter: Swoosh.Adapters.SMTP,
+               relay: smtp_relay,
+               username: smtp_username,
+               password: env_present.("SMTP_PASSWORD"),
+               port: String.to_integer(env_present.("SMTP_PORT") || "587"),
+               ssl: smtp_ssl?,
+               tls: String.to_atom(env_present.("SMTP_TLS") || "if_available"),
+               tls_options: smtp_tls,
+               # Relays that accept unauthenticated mail (e.g. an internal one) need no login.
+               auth: if(smtp_username, do: :always, else: :never),
+               retries: 2
+             ] ++ if(smtp_ssl?, do: [sockopts: smtp_tls], else: [])
 
     "mailgun" ->
       config :fleetms, Fleetms.Mailer,

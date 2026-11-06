@@ -13,6 +13,7 @@ defmodule FleetmsWeb.AuthLive.ForgotPassword do
     {:ok,
      socket
      |> assign(:page_title, gettext("Reset your password"))
+     |> assign(:email_delivers?, Fleetms.Mailer.delivers?())
      |> assign(:trigger_action, false)
      |> assign(:form, to_form(%{}, as: "user"))}
   end
@@ -26,6 +27,15 @@ defmodule FleetmsWeb.AuthLive.ForgotPassword do
       </h1>
       <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
         {gettext("Enter your email and we'll send you a link to reset your password.")}
+      </p>
+      <p
+        :if={!@email_delivers?}
+        id="email-not-set-up"
+        class="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+      >
+        {gettext(
+          "This server can't send email yet, so no reset link will arrive. Ask your administrator to set up email for this server, then try again."
+        )}
       </p>
 
       <.form

@@ -78,6 +78,42 @@ defmodule FleetmsWeb.UserLiveTest do
     end
   end
 
+  describe "without an email provider" do
+    setup do
+      previous = Application.get_env(:fleetms, Fleetms.Mailer)
+      Application.put_env(:fleetms, Fleetms.Mailer, adapter: Swoosh.Adapters.Logger)
+      on_exit(fn -> Application.put_env(:fleetms, Fleetms.Mailer, previous) end)
+    end
+
+    test "Add member starts on the username tab", %{conn: conn, org: org} do
+      {:ok, _view, html} = live(conn, ~p"/o/#{org}/users/new")
+      assert html =~ "For people without an email"
+      refute html =~ "email-not-set-up"
+    end
+
+    test "the invite tab explains that email isn't set up", %{conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/o/#{org}/users/new")
+
+      html = view |> element("button", "Invite by email") |> render_click()
+
+      assert html =~ "email-not-set-up"
+      assert html =~ "Email isn&#39;t set up on this server yet"
+      refute html =~ "We&#39;ll email them a link"
+    end
+
+    test "inviting a new email doesn't claim it was sent", %{conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/o/#{org}/users/new")
+      view |> element("button", "Invite by email") |> render_click()
+
+      email = "invitee-#{System.unique_integer([:positive])}@example.com"
+      view |> form("#member-form", member: %{email: email}) |> render_submit()
+
+      html = render(view)
+      assert html =~ "Invitation saved, but not sent"
+      refute html =~ "Invitation sent."
+    end
+  end
+
   describe "lifecycle" do
     test "suspend then reactivate a member", %{conn: conn, org: org} do
       member = add_plain_member(org)

@@ -25,8 +25,13 @@ defmodule FleetmsWeb.UserLive do
   end
 
   defp apply_action(socket, :new, _params) do
+    # Without an email provider an invitation never arrives, so start on the
+    # username tab, which works without email.
+    email_delivers? = Fleetms.Mailer.delivers?()
+
     socket
-    |> assign(:member_mode, :invite)
+    |> assign(:email_delivers?, email_delivers?)
+    |> assign(:member_mode, if(email_delivers?, do: :invite, else: :username))
     |> assign(:member_form, to_form(%{}, as: "member"))
   end
 
@@ -222,9 +227,28 @@ defmodule FleetmsWeb.UserLive do
           class="space-y-4"
         >
           <%= if @member_mode == :invite do %>
-            <p class="text-sm text-body">
+            <p :if={@email_delivers?} class="text-sm text-body">
               {gettext("We'll email them a link to set up their account and join.")}
             </p>
+            <div
+              :if={!@email_delivers?}
+              id="email-not-set-up"
+              class="rounded-base border border-default bg-neutral-secondary-soft p-3 text-sm text-body"
+            >
+              <p class="font-medium text-heading">
+                {gettext("Email isn't set up on this server yet")}
+              </p>
+              <p class="mt-1">
+                {gettext(
+                  "New people can't receive an invitation, so use Create with username instead. Someone who already has an account here can still be added by their email."
+                )}
+              </p>
+              <p class="mt-1">
+                {gettext(
+                  "To send invitations, your administrator adds the email (SMTP) settings to the server's environment: SMTP_RELAY, SMTP_USERNAME, SMTP_PASSWORD and EMAIL_FROM."
+                )}
+              </p>
+            </div>
             <.input field={f[:email]} type="email" label={gettext("Email")} required />
           <% else %>
             <p class="text-sm text-body">
@@ -386,7 +410,7 @@ defmodule FleetmsWeb.UserLive do
       end
 
     case result do
-      {:ok, :invited, _} -> {:noreply, done(socket, gettext("Invitation sent."))}
+      {:ok, :invited, _} -> {:noreply, done(socket, invited_message())}
       {:ok, :added, _} -> {:noreply, done(socket, gettext("Member added."))}
       {:ok, _user} -> {:noreply, done(socket, gettext("Member created."))}
       {:error, reason} -> {:noreply, put_flash(socket, :error, error_message(reason))}
@@ -552,6 +576,16 @@ defmodule FleetmsWeb.UserLive do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
+
+  defp invited_message do
+    if Fleetms.Mailer.delivers?() do
+      gettext("Invitation sent.")
+    else
+      gettext(
+        "Invitation saved, but not sent: this server can't send email yet. Create them with a username instead."
+      )
+    end
+  end
 
   defp error_message(:forbidden), do: gettext("You're not allowed to do that.")
   defp error_message({:cannot, what}), do: gettext("You can't %{what}.", what: what)
