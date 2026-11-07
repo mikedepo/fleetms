@@ -34,6 +34,9 @@ defmodule Fleetms.Accounts.Invitation.Changes.Invite do
           {:error, reason} ->
             Logger.error("Invitation email to #{invitation.email} failed: #{inspect(reason)}")
 
+            # The link never reached anyone; don't leave a pending invitation behind.
+            Fleetms.Accounts.revoke_invitation(invitation, authorize?: false)
+
             {:error,
              Ash.Error.Changes.InvalidAttribute.exception(
                field: :email,
