@@ -8,6 +8,8 @@ defmodule Fleetms.Accounts.Invitation.Changes.Invite do
   """
   use Ash.Resource.Change
 
+  require Logger
+
   alias Fleetms.Accounts.Invitation.Changes.GenerateToken
   alias Fleetms.Accounts.Invitation.Senders.SendInvitationEmail
 
@@ -25,8 +27,20 @@ defmodule Fleetms.Accounts.Invitation.Changes.Invite do
     |> Ash.Changeset.force_change_attribute(:expires_at, expires_at)
     |> Ash.Changeset.after_transaction(fn
       _changeset, {:ok, invitation} ->
-        SendInvitationEmail.send(invitation, token, org_name)
-        {:ok, invitation}
+        case SendInvitationEmail.send(invitation, token, org_name) do
+          {:ok, _receipt} ->
+            {:ok, invitation}
+
+          {:error, reason} ->
+            Logger.error("Invitation email to #{invitation.email} failed: #{inspect(reason)}")
+
+            {:error,
+             Ash.Error.Changes.InvalidAttribute.exception(
+               field: :email,
+               message:
+                 "The invitation email could not be sent. Check the server's email settings (sender address and SMTP credentials) and try again."
+             )}
+        end
 
       _changeset, other ->
         other
