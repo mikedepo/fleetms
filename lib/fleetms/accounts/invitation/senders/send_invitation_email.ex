@@ -9,6 +9,7 @@ defmodule Fleetms.Accounts.Invitation.Senders.SendInvitationEmail do
 
   alias Fleetms.Mailer
 
+  @doc "Returns `{:ok, _}` or `{:error, reason}`; delivery failures never raise."
   def send(invitation, token, organization_name) do
     opts = [
       title: "You're invited to #{organization_name}",
@@ -25,6 +26,6 @@ defmodule Fleetms.Accounts.Invitation.Senders.SendInvitationEmail do
     |> subject("You've been invited to join #{organization_name} on FleetMS")
     |> html_body(Fleetms.Emails.action_email(opts))
     |> text_body(Fleetms.Emails.action_email_text(opts))
-    |> Mailer.deliver!()
+    |> Mailer.deliver()
   end
 end

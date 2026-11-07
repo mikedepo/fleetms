@@ -158,6 +158,27 @@ defmodule Fleetms.MembershipTest do
       assert user.id in Enum.map(members, & &1.user_id)
     end
 
+    test "assigns the invitation's role", %{owner: owner, org: org} do
+      email = "invitee-#{System.unique_integer([:positive])}@example.com"
+      role = system_role("Read Only", org)
+
+      {:ok, :invited, _invitation} =
+        Membership.invite_member(%{email: email, role_id: role.id}, org, owner)
+
+      token = capture_invitation_token()
+
+      # Regression: there is no actor when accepting, so looking up the org under
+      # its read policy found nothing and raised NotFound.
+      assert {:ok, user} =
+               Membership.accept_invitation(token, %{
+                 password: "password1234",
+                 password_confirmation: "password1234",
+                 profile: %{first_name: "Joiner"}
+               })
+
+      assert role_assigned?(user.id, role.id, org)
+    end
+
     test "a used or unknown token is rejected", %{owner: _owner, org: _org} do
       assert {:error, _} =
                Membership.accept_invitation("not-a-real-token", %{

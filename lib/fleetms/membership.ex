@@ -273,7 +273,10 @@ defmodule Fleetms.Membership do
   end
 
   defp organization!(%Organization{} = org), do: org
-  defp organization!(org) when is_binary(org), do: Accounts.get_organization!(org_id(org))
+  # Only resolves an id to the record; callers do their own authorization (or are
+  # the authorization check), and accepting an invitation has no actor at all.
+  defp organization!(org) when is_binary(org),
+    do: Accounts.get_organization!(org_id(org), authorize?: false)
 
   defp org_id(%Organization{id: id}), do: id
   defp org_id("org_" <> id), do: id

@@ -78,7 +78,16 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  # Trim stray whitespace/newlines pasted into the variable, and show the value the
+  # release booted with so a host mismatch (websocket 403) is easy to spot in logs.
+  host = String.trim(System.get_env("PHX_HOST") || "example.com")
+  IO.puts("[runtime] endpoint host (PHX_HOST) = #{inspect(host)}")
+
+  # Railway drops logs above ~500 lines/sec. Set LOG_LEVEL=warning to silence the
+  # per-request "GET /..." / "Sent 200" lines (debug|info|notice|warning|error).
+  if log_level = System.get_env("LOG_LEVEL") do
+    config :logger, level: String.to_existing_atom(log_level)
+  end
 
   config :fleetms, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
